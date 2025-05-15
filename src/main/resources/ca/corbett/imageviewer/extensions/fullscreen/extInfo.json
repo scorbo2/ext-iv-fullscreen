@@ -1,0 +1,13 @@
+{
+  "name": "Full screen mode",
+  "version": "1.0",
+  "author": "steve@corbett.ca",
+  "targetAppName": "ImageViewer",
+  "targetAppVersion": "2.1",
+  "shortDescription": "Presents a full-screen view of the current directory.",
+  "longDescription": "Presents a full-screen mode for ImageViewer. Use keyboard arrows to navigate forwards and backwards. Compatible with the QuickAccess extension.",
+  "releaseNotes": "1.0 - extracted from ImageViewer 1.3",
+  "customFields": {
+    "Keyboard shortcut": "Ctrl+F"
+  }
+}
