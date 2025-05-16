@@ -1,8 +1,10 @@
 package ca.corbett.imageviewer.extensions.fullscreen;
 
 import ca.corbett.extensions.AppExtensionInfo;
+import ca.corbett.extras.image.ImageUtil;
 import ca.corbett.extras.properties.AbstractProperty;
 import ca.corbett.extras.properties.ComboProperty;
+import ca.corbett.imageviewer.AppConfig;
 import ca.corbett.imageviewer.MenuManager;
 import ca.corbett.imageviewer.ToolBarManager;
 import ca.corbett.imageviewer.extensions.ImageViewerExtension;
@@ -16,6 +18,8 @@ import java.awt.Color;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -37,9 +41,9 @@ public class FullScreenExtension extends ImageViewerExtension {
     private final AppExtensionInfo extInfo;
     private FullScreenWindow fullScreenWindow;
 
-    private ComboProperty fullScreenMonitorIndexProp;
-
-    private final List<JButton> buttonList;
+    private final String fullScreenIndexPropName = "UI.Fullscreen.monitorIndex";
+    private final List<String> displayChoices;
+    private final BufferedImage fullScreenIconImage;
 
     public FullScreenExtension() {
         extInfo = AppExtensionInfo.fromExtensionJar(getClass(), "/ca/corbett/imageviewer/extensions/fullscreen/extInfo.json");
@@ -50,21 +54,26 @@ public class FullScreenExtension extends ImageViewerExtension {
         // Figure out how many displays we have to work with here:
         GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
         int monitorCount = env.getScreenDevices().length;
-        List<String> options = new ArrayList<>();
+        displayChoices = new ArrayList<>();
         for (int i = 0; i < monitorCount; i++) {
-            options.add("Screen " + (i + 1));
+            displayChoices.add("Screen " + (i + 1));
         }
-        fullScreenMonitorIndexProp = new ComboProperty("UI.Fullscreen.monitorIndex", "Full screen monitor", options, 0,
-                                                       false);
 
-        buttonList = new ArrayList<>();
-        buttonList.add(ToolBarManager.buildButton(
-            getClass().getResourceAsStream("/ca/corbett/imageviewer/extensions/fullscreen/icon-fullscreen.png"),
-            "Full Screen mode", new FullScreenAction(this)));
+        // Load our image icon for full screen mode (this MUST be done in constructor... see swing-extras #34)
+        try {
+            fullScreenIconImage = ImageUtil.loadFromResource(getClass(),
+                                                             "/ca/corbett/imageviewer/extensions/fullscreen/icon-fullscreen.png",
+                                                             ToolBarManager.iconSize,
+                                                             ToolBarManager.iconSize);
+        }
+        catch (IOException ioe) {
+            throw new RuntimeException("FullScreenExtension: can't load jar resources!", ioe);
+        }
     }
 
     public int getFullScreenMonitorIndex() {
-        return fullScreenMonitorIndexProp.getSelectedIndex();
+        return ((ComboProperty)AppConfig.getInstance().getPropertiesManager()
+                                        .getProperty(fullScreenIndexPropName)).getSelectedIndex();
     }
 
     @Override
@@ -75,20 +84,15 @@ public class FullScreenExtension extends ImageViewerExtension {
     @Override
     public List<AbstractProperty> getConfigProperties() {
         List<AbstractProperty> list = new ArrayList<>();
-        list.add(fullScreenMonitorIndexProp);
+        list.add(new ComboProperty(fullScreenIndexPropName, "Full screen monitor", displayChoices, 0, false));
         return list;
     }
 
     @Override
     public List<JButton> getToolBarButtons() {
-        return buttonList;
-        // swing-extras issue #34 - can't load extension jar resources outside of the constructor?? really???
-//        List<JButton> list = new ArrayList<>();
-//        System.out.println("not null? "+(FullScreenExtension.class.getResourceAsStream("/ca/corbett/imageviewer/extensions/fullscreen/icon-fullscreen.png") != null));
-//        list.add(ToolBarManager.buildButton(
-//            getClass().getResourceAsStream("/ca/corbett/imageviewer/extensions/fullscreen/icon-fullscreen.png"),
-//            "Full Screen mode", new FullScreenAction(this)));
-//        return list;
+        List<JButton> list = new ArrayList<>();
+        list.add(ToolBarManager.buildButton(fullScreenIconImage, "Full Screen mode", new FullScreenAction(this)));
+        return list;
     }
 
     @Override
