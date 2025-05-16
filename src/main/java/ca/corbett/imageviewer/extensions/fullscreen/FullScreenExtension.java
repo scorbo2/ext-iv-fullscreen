@@ -46,7 +46,8 @@ public class FullScreenExtension extends ImageViewerExtension {
     private final BufferedImage fullScreenIconImage;
 
     public FullScreenExtension() {
-        extInfo = AppExtensionInfo.fromExtensionJar(getClass(), "/ca/corbett/imageviewer/extensions/fullscreen/extInfo.json");
+        extInfo = AppExtensionInfo.fromExtensionJar(getClass(),
+                                                    "/ca/corbett/imageviewer/extensions/fullscreen/extInfo.json");
         if (extInfo == null) {
             throw new RuntimeException("FullScreenExtension: can't parse extInfo.json!");
         }
