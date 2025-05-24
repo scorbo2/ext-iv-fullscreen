@@ -22,7 +22,7 @@ mvn package
 Now you can copy the extension jar to wherever you keep your imageviewer extensions:
 
 ```shell
-cp target/ext-iv-fullscreen-1.0-SNAPSHOT.jar ~/.ImageViewer/extensions
+cp target/ext-iv-fullscreen-2.1.0-SNAPSHOT.jar ~/.ImageViewer/extensions
 ```
 
 Now restart imageviewer and you should find a new property in the properties dialog:
