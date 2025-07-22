@@ -42,7 +42,6 @@ public class FullScreenExtension extends ImageViewerExtension {
     private FullScreenWindow fullScreenWindow;
 
     private final String fullScreenIndexPropName = "UI.Fullscreen.monitorIndex";
-    private final List<String> displayChoices;
     private final BufferedImage fullScreenIconImage;
 
     public FullScreenExtension() {
@@ -50,14 +49,6 @@ public class FullScreenExtension extends ImageViewerExtension {
                                                     "/ca/corbett/imageviewer/extensions/fullscreen/extInfo.json");
         if (extInfo == null) {
             throw new RuntimeException("FullScreenExtension: can't parse extInfo.json!");
-        }
-
-        // Figure out how many displays we have to work with here:
-        GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        int monitorCount = env.getScreenDevices().length;
-        displayChoices = new ArrayList<>();
-        for (int i = 0; i < monitorCount; i++) {
-            displayChoices.add("Screen " + (i + 1));
         }
 
         // Load our image icon for full screen mode (this MUST be done in constructor... see swing-extras #34)
@@ -83,7 +74,15 @@ public class FullScreenExtension extends ImageViewerExtension {
     }
 
     @Override
-    public List<AbstractProperty> getConfigProperties() {
+    protected List<AbstractProperty> createConfigProperties() {
+        // Figure out how many displays we have to work with here:
+        GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        int monitorCount = env.getScreenDevices().length;
+        List<String> displayChoices = new ArrayList<>();
+        for (int i = 0; i < monitorCount; i++) {
+            displayChoices.add("Screen " + (i + 1));
+        }
+
         List<AbstractProperty> list = new ArrayList<>();
         list.add(new ComboProperty(fullScreenIndexPropName, "Full screen monitor", displayChoices, 0, false));
         return list;
