@@ -5,7 +5,6 @@ import ca.corbett.extras.image.ImageUtil;
 import ca.corbett.extras.properties.AbstractProperty;
 import ca.corbett.extras.properties.ComboProperty;
 import ca.corbett.imageviewer.AppConfig;
-import ca.corbett.imageviewer.MenuManager;
 import ca.corbett.imageviewer.ToolBarManager;
 import ca.corbett.imageviewer.extensions.ImageViewerExtension;
 import ca.corbett.imageviewer.ui.ImageInstance;
@@ -84,7 +83,7 @@ public class FullScreenExtension extends ImageViewerExtension {
         }
 
         List<AbstractProperty> list = new ArrayList<>();
-        list.add(new ComboProperty(fullScreenIndexPropName, "Full screen monitor", displayChoices, 0, false));
+        list.add(new ComboProperty<>(fullScreenIndexPropName, "Full screen monitor", displayChoices, 0, false));
         return list;
     }
 
@@ -96,7 +95,7 @@ public class FullScreenExtension extends ImageViewerExtension {
     }
 
     @Override
-    public List<JMenuItem> getMenuItems(String topLevelMenu) {
+    public List<JMenuItem> getMenuItems(String topLevelMenu, MainWindow.BrowseMode browseMode) {
         if ("View".equals(topLevelMenu)) {
             List<JMenuItem> list = new ArrayList<>();
             JMenuItem item = new JMenuItem(new FullScreenAction(this));
@@ -127,7 +126,16 @@ public class FullScreenExtension extends ImageViewerExtension {
     @Override
     public void quickMoveTreeChanged() {
         if (fullScreenWindow != null) {
-            fullScreenWindow.setImagePanelPopupMenu(MenuManager.buildImagePanelPopupMenu());
+            fullScreenWindow.setImagePanelPopupMenu(
+                MainWindow.getInstance().getMenuManager().buildImagePanelPopupMenu());
+        }
+    }
+
+    @Override
+    public void browseModeChanged(MainWindow.BrowseMode newBrowseMode) {
+        if (fullScreenWindow != null) {
+            fullScreenWindow.setImagePanelPopupMenu(
+                MainWindow.getInstance().getMenuManager().buildImagePanelPopupMenu());
         }
     }
 
@@ -151,7 +159,7 @@ public class FullScreenExtension extends ImageViewerExtension {
         fullScreenWindow = new FullScreenWindow(this);
         ImageInstance currentImage = MainWindow.getInstance().getSelectedImage();
         fullScreenWindow.setImage(currentImage);
-        fullScreenWindow.setImagePanelPopupMenu(MenuManager.buildImagePanelPopupMenu());
+        fullScreenWindow.setImagePanelPopupMenu(MainWindow.getInstance().getMenuManager().buildImagePanelPopupMenu());
         fullScreenWindow.goFullScreen();
     }
 

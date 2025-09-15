@@ -22,7 +22,7 @@ mvn package
 Now you can copy the extension jar to wherever you keep your imageviewer extensions:
 
 ```shell
-cp target/ext-iv-fullscreen-2.1.0.jar ~/.ImageViewer/extensions
+cp target/ext-iv-fullscreen-2.2.0.jar ~/.ImageViewer/extensions
 ```
 
 Now restart imageviewer and you should find a new property in the properties dialog:
@@ -34,7 +34,7 @@ You can use the dropdown to select which display should host the fullscreen view
 
 ### Requirements
 
-Imageviewer 2.1 or higher.
+Imageviewer 2.2 or higher.
 
 ### License
 
