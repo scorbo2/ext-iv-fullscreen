@@ -88,7 +88,7 @@ public class FullScreenExtension extends ImageViewerExtension {
     }
 
     @Override
-    public List<JButton> getToolBarButtons() {
+    public List<JButton> getMainToolBarButtons() {
         List<JButton> list = new ArrayList<>();
         list.add(ToolBarManager.buildButton(fullScreenIconImage, "Full Screen mode", new FullScreenAction(this)));
         return list;
