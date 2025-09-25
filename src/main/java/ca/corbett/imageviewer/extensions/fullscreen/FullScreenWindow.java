@@ -47,6 +47,10 @@ public final class FullScreenWindow extends JFrame {
     private final ImagePanelConfig imagePanelConf;
     private final JPanel wrapperPanel;
     private final FullScreenExtension owner;
+    private final JComponent westComponent;
+    private final JComponent eastComponent;
+    private final JComponent northComponent;
+    private final JComponent southComponent;
 
     public FullScreenWindow(FullScreenExtension owner) {
         super("ImageViewer Fullscreen");
@@ -84,13 +88,13 @@ public final class FullScreenWindow extends JFrame {
 
         // Add extra panels, if any are supplied by our extensions:
         // (this is how we support QuickAccess extension here, even though this code doesn't know that exists)
-        JComponent westComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
+        westComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
             ImageViewerExtension.ExtraPanelPosition.Left);
-        JComponent eastComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
+        eastComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
             ImageViewerExtension.ExtraPanelPosition.Right);
-        JComponent northComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
+        northComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
             ImageViewerExtension.ExtraPanelPosition.Top);
-        JComponent southComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
+        southComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
             ImageViewerExtension.ExtraPanelPosition.Bottom);
         if (westComponent != null) {
             wrapperPanel.add(westComponent, BorderLayout.WEST);
@@ -133,6 +137,24 @@ public final class FullScreenWindow extends JFrame {
                     // DEL to delete the current image:
                     case KeyEvent.VK_DELETE:
                         MainWindow.getInstance().deleteSelectedImage();
+                        break;
+
+                    // Ctrl+P to toggle extra panel visibility:
+                    case KeyEvent.VK_P:
+                        if (e.isControlDown()) {
+                            if (westComponent != null) {
+                                westComponent.setVisible(!westComponent.isVisible());
+                            }
+                            if (eastComponent != null) {
+                                eastComponent.setVisible(!eastComponent.isVisible());
+                            }
+                            if (northComponent != null) {
+                                northComponent.setVisible(!northComponent.isVisible());
+                            }
+                            if (southComponent != null) {
+                                southComponent.setVisible(!southComponent.isVisible());
+                            }
+                        }
                         break;
                 }
             }
