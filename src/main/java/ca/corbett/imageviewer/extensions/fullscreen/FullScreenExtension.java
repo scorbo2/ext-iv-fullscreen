@@ -41,7 +41,7 @@ public class FullScreenExtension extends ImageViewerExtension {
     private FullScreenWindow fullScreenWindow;
 
     private final String fullScreenIndexPropName = "UI.Fullscreen.monitorIndex";
-    private final BufferedImage fullScreenIconImage;
+    private BufferedImage fullScreenIconImage;
 
     public FullScreenExtension() {
         extInfo = AppExtensionInfo.fromExtensionJar(getClass(),
@@ -49,8 +49,21 @@ public class FullScreenExtension extends ImageViewerExtension {
         if (extInfo == null) {
             throw new RuntimeException("FullScreenExtension: can't parse extInfo.json!");
         }
+    }
 
-        // Load our image icon for full screen mode (this MUST be done in constructor... see swing-extras #34)
+    public int getFullScreenMonitorIndex() {
+        //noinspection unchecked
+        return ((ComboProperty<String>)AppConfig.getInstance().getPropertiesManager()
+                                                .getProperty(fullScreenIndexPropName)).getSelectedIndex();
+    }
+
+    @Override
+    public AppExtensionInfo getInfo() {
+        return extInfo;
+    }
+
+    @Override
+    public void loadJarResources() {
         try {
             fullScreenIconImage = ImageUtil.loadFromResource(getClass(),
                                                              "/ca/corbett/imageviewer/extensions/fullscreen/icon-fullscreen.png",
@@ -60,16 +73,6 @@ public class FullScreenExtension extends ImageViewerExtension {
         catch (IOException ioe) {
             throw new RuntimeException("FullScreenExtension: can't load jar resources!", ioe);
         }
-    }
-
-    public int getFullScreenMonitorIndex() {
-        return ((ComboProperty)AppConfig.getInstance().getPropertiesManager()
-                                        .getProperty(fullScreenIndexPropName)).getSelectedIndex();
-    }
-
-    @Override
-    public AppExtensionInfo getInfo() {
-        return extInfo;
     }
 
     @Override
