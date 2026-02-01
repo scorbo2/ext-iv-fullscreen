@@ -7,6 +7,6 @@
   "shortDescription": "Presents a full-screen view of the current directory.",
   "longDescription": "Presents a full-screen mode for ImageViewer. Use keyboard arrows to navigate forwards and backwards. Compatible with the QuickAccess extension.",
   "customFields": {
-    "Keyboard shortcut": "Ctrl+F by default - change in application settings. "
+    "Keyboard shortcut": "Ctrl+F by default - change in application settings."
   }
 }

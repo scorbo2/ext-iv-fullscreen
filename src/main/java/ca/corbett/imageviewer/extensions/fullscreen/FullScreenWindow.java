@@ -158,12 +158,11 @@ public final class FullScreenWindow extends JFrame {
     }
 
     public void goFullScreen() {
-        //graphicsDevice.setFullScreenWindow(this);
-        setVisible(true); // tmp
+        graphicsDevice.setFullScreenWindow(this);
     }
 
     public void stopFullScreen() {
-        //graphicsDevice.setFullScreenWindow(null);
+        graphicsDevice.setFullScreenWindow(null);
         setAlwaysOnTop(false);
         setVisible(false);
         owner.fullScreenEnded();
