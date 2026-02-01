@@ -3,11 +3,15 @@ package ca.corbett.imageviewer.extensions.fullscreen;
 import ca.corbett.extras.LookAndFeelManager;
 import ca.corbett.extras.image.ImagePanel;
 import ca.corbett.extras.image.ImagePanelConfig;
+import ca.corbett.extras.io.KeyStrokeManager;
+import ca.corbett.extras.properties.KeyStrokeProperty;
+import ca.corbett.imageviewer.AppConfig;
 import ca.corbett.imageviewer.extensions.ImageViewerExtension;
 import ca.corbett.imageviewer.extensions.ImageViewerExtensionManager;
 import ca.corbett.imageviewer.ui.ImageInstance;
 import ca.corbett.imageviewer.ui.MainWindow;
 
+import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -18,166 +22,59 @@ import java.awt.Color;
 import java.awt.DisplayMode;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowStateListener;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Represents a full-screen window that can be used by ImageViewer to provide a full-screen
- * view of the current directory.
+ * view of the current directory. This is more than just a full-screen image panel.
+ * The window is constructed by the same rules as the main image panel in the application's
+ * main window. This means that any extra panels provided by other extensions (for example,
+ * QuickAccess or ICE's quick tag panel) will also be shown here, if those extensions
+ * are present and enabled. You can hit Ctrl+P (or whatever this shortcut has been remapped
+ * to) while in full-screen mode to toggle the visibility of those extra panels.
  *
- * @author scorbett
+ * @author <a href="https://github.com/scorbo2">scorbo2</a>
  */
 public final class FullScreenWindow extends JFrame {
 
     private static final Logger logger = Logger.getLogger(FullScreenWindow.class.getName());
-    private final GraphicsDevice graphicsDevice;
-    private final boolean isFullscreenSupported;
-    private final int monitorCount;
+    private GraphicsDevice graphicsDevice;
     private final ImagePanel imagePanel;
     private final ImagePanelConfig imagePanelConf;
-    private final JPanel wrapperPanel;
     private final FullScreenExtension owner;
-    private final JComponent westComponent;
-    private final JComponent eastComponent;
-    private final JComponent northComponent;
-    private final JComponent southComponent;
+    private JComponent westComponent;
+    private JComponent eastComponent;
+    private JComponent northComponent;
+    private JComponent southComponent;
+    private final KeyStrokeManager keyStrokeManager;
 
     public FullScreenWindow(FullScreenExtension owner) {
         super("ImageViewer Fullscreen");
         this.owner = owner;
-        setIconImage(MainWindow.getInstance().getIconImage());
+        setIconImage(MainWindow.getInstance().getIconImage()); // steal icon from main window
 
-        // Sanity check our preferred display... it may not exist.
-        // This can happen if you set it up on a laptop when you were docked to an external
-        // monitor, but now you're running on the standalone laptop where your second
-        // display is no longer present.
-        GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        monitorCount = env.getScreenDevices().length;
-        int preferredMonitorIndex = owner.getFullScreenMonitorIndex();
-        if (preferredMonitorIndex >= monitorCount) {
-            logger.log(Level.INFO, "Preferred fullscreen monitor not available; defaulting to primary.");
-            preferredMonitorIndex = 0; // failsafe default
-        }
-        DisplayMode displayMode = env.getScreenDevices()[preferredMonitorIndex].getDisplayMode();
-        setSize(displayMode.getWidth(), displayMode.getHeight()); // apparently initial size matters
-        graphicsDevice = env.getScreenDevices()[preferredMonitorIndex];
-        isFullscreenSupported = graphicsDevice.isFullScreenSupported();
-        logger.log(Level.INFO, "isFullscreenSupported: {0}", isFullscreenSupported);
+        prepareForFullScreen();
 
         // Turn off decorations on this window (otherwise you get an ugly title bar/window controls):
         getRootPane().setWindowDecorationStyle(JRootPane.NONE);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
+        // Prepare our image panel:
         imagePanelConf = ImagePanelConfig.createSimpleReadOnlyProperties();
         imagePanelConf.setBgColor(LookAndFeelManager.getLafColor("Panel.background", Color.LIGHT_GRAY));
         imagePanel = new ImagePanel(imagePanelConf);
-        setLayout(new BorderLayout());
 
-        wrapperPanel = new JPanel();
-        wrapperPanel.setLayout(new BorderLayout());
+        rebuildLayout();
 
-        // Add extra panels, if any are supplied by our extensions:
-        // (this is how we support QuickAccess extension here, even though this code doesn't know that exists)
-        westComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
-            ImageViewerExtension.ExtraPanelPosition.Left);
-        eastComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
-            ImageViewerExtension.ExtraPanelPosition.Right);
-        northComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
-            ImageViewerExtension.ExtraPanelPosition.Top);
-        southComponent = ImageViewerExtensionManager.getInstance().getExtraPanelComponent(
-            ImageViewerExtension.ExtraPanelPosition.Bottom);
-        if (westComponent != null) {
-            wrapperPanel.add(westComponent, BorderLayout.WEST);
-        }
-        if (eastComponent != null) {
-            wrapperPanel.add(eastComponent, BorderLayout.EAST);
-        }
-        if (northComponent != null) {
-            wrapperPanel.add(northComponent, BorderLayout.NORTH);
-        }
-        if (southComponent != null) {
-            wrapperPanel.add(southComponent, BorderLayout.SOUTH);
-        }
-        wrapperPanel.add(imagePanel, BorderLayout.CENTER);
-
-        add(wrapperPanel, BorderLayout.CENTER);
-
-        // Add the key listener once:
-        KeyListener keyListener = new KeyAdapter() {
-            @Override
-            public void keyReleased(KeyEvent e) {
-                switch (e.getKeyCode()) {
-                    // Left or Up arrow for "previous":
-                    case KeyEvent.VK_LEFT:
-                    case KeyEvent.VK_UP:
-                        MainWindow.getInstance().selectPreviousImage();
-                        break;
-
-                    // Right or down arrow for "next":
-                    case KeyEvent.VK_RIGHT:
-                    case KeyEvent.VK_DOWN:
-                        MainWindow.getInstance().selectNextImage();
-                        break;
-
-                    // ESC to exit full screen:
-                    case KeyEvent.VK_ESCAPE:
-                        stopFullScreen();
-                        break;
-
-                    // DEL to delete the current image:
-                    case KeyEvent.VK_DELETE:
-                        MainWindow.getInstance().deleteSelectedImage();
-                        break;
-
-                    // Ctrl+P to toggle extra panel visibility:
-                    case KeyEvent.VK_P:
-                        if (e.isControlDown()) {
-                            if (westComponent != null) {
-                                westComponent.setVisible(!westComponent.isVisible());
-                            }
-                            if (eastComponent != null) {
-                                eastComponent.setVisible(!eastComponent.isVisible());
-                            }
-                            if (northComponent != null) {
-                                northComponent.setVisible(!northComponent.isVisible());
-                            }
-                            if (southComponent != null) {
-                                southComponent.setVisible(!southComponent.isVisible());
-                            }
-                        }
-                        break;
-                }
-            }
-
-        };
-        addKeyListener(keyListener);
-        wrapperPanel.addKeyListener(keyListener);
-
-        // This is a long shot, as we don't know what these components are exactly, but we
-        // should at least try to ensure that if one of them has focus, we can still respond
-        // to keyboard input.
-        if (northComponent != null) {
-            northComponent.addKeyListener(keyListener);
-        }
-        if (southComponent != null) {
-            southComponent.addKeyListener(keyListener);
-        }
-        if (westComponent != null) {
-            westComponent.addKeyListener(keyListener);
-        }
-        if (eastComponent != null) {
-            eastComponent.addKeyListener(keyListener);
-        }
+        // Set up our keyboard shortcuts:
+        keyStrokeManager = new KeyStrokeManager(this);
+        configureKeyStrokes();
 
         addListeners();
     }
@@ -185,6 +82,36 @@ public final class FullScreenWindow extends JFrame {
     public void setCustomBackground(Color c) {
         imagePanelConf.setBgColor(c);
         imagePanel.applyProperties(imagePanelConf);
+    }
+
+    /**
+     * Toggles the visibility status of whatever extra panels are currently
+     * showing in this full-screen window. If no extra panels are present,
+     * this method does nothing.
+     */
+    public void toggleExtraPanelVisibility() {
+        // Note: the logic here isn't great.
+        //   a) we only see JComponents, we have no idea what they actually are.
+        //   b) we can't cast them to anything, as we don't have access to the extension code that provides them.
+        //   c) the supplying extension may have its own visibility rules that we are violating here.
+        //   d) we just do a blind toggle to invert the current visibility state.
+        //
+        // It's pretty much the best we can do, and it works okay in practice.
+        // The user also has the option of disabling extra panels in application settings,
+        // if they really don't want to see them in full-screen mode.
+
+        if (westComponent != null) {
+            westComponent.setVisible(!westComponent.isVisible());
+        }
+        if (eastComponent != null) {
+            eastComponent.setVisible(!eastComponent.isVisible());
+        }
+        if (northComponent != null) {
+            northComponent.setVisible(!northComponent.isVisible());
+        }
+        if (southComponent != null) {
+            southComponent.setVisible(!southComponent.isVisible());
+        }
     }
 
     public void setImage(ImageInstance image) {
@@ -203,81 +130,129 @@ public final class FullScreenWindow extends JFrame {
         imagePanel.setPopupMenu(menu);
     }
 
+    /**
+     * Adds various listeners to this full-screen window and its components.
+     */
     private void addListeners() {
+        // add a window state listener for logging purposes:
+        addWindowStateListener(e -> logger.log(Level.FINE, "Full-screen window state changed: {0} to {1}",
+                                               new Object[]{e.getOldState(), e.getNewState()}));
 
-        // Add the focus listener once:
-        final int deviceCount = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices().length;
-        addFocusListener(new FocusListener() {
-            @Override
-            public void focusGained(FocusEvent arg0) {
-                setAlwaysOnTop(true);
-            }
-
-            @Override
-            public void focusLost(FocusEvent arg0) {
-                // If there's only one monitor, stop full screen mode when focus is lost.
-                // This almost certainly means someone alt+tabbed away from the visualizer,
-                // and so we'll just kill it.
-                // If there's more than one monitor, ignore this event as it's possible
-                // to leave the visualizer up on monitor 2 while doing stuff on monitor 1.
-                if (deviceCount == 1) {
-                    //setAlwaysOnTop(false);
-                    //stopFullScreen();
-                    // The above works okay in MusicPlayer but I'm not wild about it here.
-                    // On single monitor setup, you lose focus as soon as you bring
-                    // up the popup menu, which immediately kills fullscreen mode.
-                }
-
-                // Thumbpanel steals focus when selectNext() or selectPrevious() is invoked.
-                // Steal it back so we don't lose our ESCAPE to exit thing.
-                // This does cause wonky taskbar flashing on single-monitor setups, but the
-                // alternative is that the thumbpanel (behind the full screen window) will somehow
-                // have keyboard focus, and you have to click the window before ESC will count).
-                //requestFocus();
-                // (added logic to ThumbPanel to not do that if full screen window is up)
-            }
-
-        });
-
-        // add a window state listener:
-        addWindowStateListener(new WindowStateListener() {
-            @Override
-            public void windowStateChanged(WindowEvent e) {
-                logger.log(Level.INFO, "Full-screen window state changed: {0} to {1}",
-                           new Object[]{e.getOldState(), e.getNewState()});
-            }
-
-        });
-
+        // I don't remember why this is needed...
         imagePanel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 requestFocusInWindow();
             }
-
         });
 
         // We need this windowClosing listener so we can be informed if the window is closed
-        // through some user action that we otherwise can't trap (like right clicking it on the
+        // through some user action that we otherwise can't trap (like right-clicking it on the
         // taskbar and closing it from there):
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
                 owner.fullScreenEnded();
             }
-
         });
     }
 
     public void goFullScreen() {
-        graphicsDevice.setFullScreenWindow(this);
+        //graphicsDevice.setFullScreenWindow(this);
+        setVisible(true); // tmp
     }
 
     public void stopFullScreen() {
-        graphicsDevice.setFullScreenWindow(null);
+        //graphicsDevice.setFullScreenWindow(null);
         setAlwaysOnTop(false);
         setVisible(false);
         owner.fullScreenEnded();
     }
 
+    /**
+     * Configures our KeyStrokeManager with the current application keystroke settings.
+     */
+    public void configureKeyStrokes() {
+        keyStrokeManager.clear();
+
+        // I'm not wild about effectively duplicating MainWindow's KeyStrokesManager logic
+        // here, but there doesn't seem to be a way to share that instance,
+        // or copy it programmatically. Really, what I want to do is add this window to
+        // the existing KeyStrokesManager instance in MainWindow, but KeyStrokeManager
+        // currently only supports a single Window target.
+        for (KeyStrokeProperty prop : AppConfig.getInstance().getKeyStrokeProperties()) {
+            // If there's no Action attached, or if there is no keystroke assigned to it, skip it:
+            if (prop.getAction() == null || prop.getKeyStroke() == null) {
+                continue;
+            }
+
+            // Register it!
+            keyStrokeManager.registerHandler(prop.getKeyStroke(), prop.getAction());
+        }
+
+        // Add default Escape key to exit full-screen mode:
+        keyStrokeManager.registerHandler(KeyStrokeManager.parseKeyStroke("esc"), new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                stopFullScreen();
+            }
+        });
+    }
+
+    /**
+     * Does a sanity check on our preferred display, because it may not exist.
+     * This can happen if you set it up on a laptop when you were docked to an external
+     * monitor, but now you're running on the standalone laptop where your second
+     * display is no longer present. If the actual monitor count is less than what
+     * the user prefers, we just default to the primary monitor (index 0).
+     */
+    private void prepareForFullScreen() {
+        GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        int monitorCount = env.getScreenDevices().length;
+        int preferredMonitorIndex = owner.getFullScreenMonitorIndex();
+        if (preferredMonitorIndex >= monitorCount) {
+            logger.log(Level.INFO, "Preferred fullscreen monitor not available; defaulting to primary.");
+            preferredMonitorIndex = 0; // failsafe default
+        }
+        DisplayMode displayMode = env.getScreenDevices()[preferredMonitorIndex].getDisplayMode();
+        setSize(displayMode.getWidth(), displayMode.getHeight()); // apparently initial size matters
+        graphicsDevice = env.getScreenDevices()[preferredMonitorIndex];
+        logger.log(Level.FINE, "isFullscreenSupported: {0}", graphicsDevice.isFullScreenSupported());
+    }
+
+    /**
+     * Handles building or rebuilding the layout of this full-screen window,
+     * including any extra panels provided by other extensions.
+     */
+    public void rebuildLayout() {
+        // Detect extra panels, if any are supplied by other extensions:
+        ImageViewerExtensionManager extManager = ImageViewerExtensionManager.getInstance();
+        westComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Left);
+        eastComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Right);
+        northComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Top);
+        southComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Bottom);
+
+        JPanel wrapperPanel = new JPanel();
+        wrapperPanel.setLayout(new BorderLayout());
+        if (westComponent != null) {
+            wrapperPanel.add(westComponent, BorderLayout.WEST);
+        }
+        if (eastComponent != null) {
+            wrapperPanel.add(eastComponent, BorderLayout.EAST);
+        }
+        if (northComponent != null) {
+            wrapperPanel.add(northComponent, BorderLayout.NORTH);
+        }
+        if (southComponent != null) {
+            wrapperPanel.add(southComponent, BorderLayout.SOUTH);
+        }
+        wrapperPanel.add(imagePanel, BorderLayout.CENTER);
+
+        getContentPane().removeAll();
+        setLayout(new BorderLayout());
+        add(wrapperPanel, BorderLayout.CENTER);
+        invalidate();
+        revalidate();
+        repaint();
+    }
 }
