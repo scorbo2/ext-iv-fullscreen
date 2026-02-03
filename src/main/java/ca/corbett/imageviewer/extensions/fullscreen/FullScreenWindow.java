@@ -82,11 +82,6 @@ public final class FullScreenWindow extends JFrame {
         configureKeyStrokes();
 
         addListeners();
-
-        // On first open, any extra panels that should be visible are visible:
-        // (some extensions may hide their panels in some browse modes...
-        //  we DON'T want to change visibility status of those ones)
-        isExtraPanelsVisible = true;
     }
 
     public void setCustomBackground(Color c) {
@@ -136,10 +131,6 @@ public final class FullScreenWindow extends JFrame {
                 if (panel.isVisible()) {
                     visibleExtraPanels.add(panel);
                     panel.setVisible(false);
-                    logger.info("Making panel invisible: " + panel.getClass().getName());
-                }
-                else {
-                    logger.info("Leaving panel invisible: " + panel.getClass().getName());
                 }
             }
         }
@@ -150,7 +141,6 @@ public final class FullScreenWindow extends JFrame {
         else {
             for (JComponent panel : visibleExtraPanels) {
                 panel.setVisible(true);
-                logger.info("Restoring panel visibility: " + panel.getClass().getName());
             }
             visibleExtraPanels.clear();
         }
@@ -299,5 +289,15 @@ public final class FullScreenWindow extends JFrame {
         invalidate();
         revalidate();
         repaint();
+
+        // Right now, any extra panels that should be visible are visible:
+        // (some extensions may hide their panels in some browse modes...
+        //  we DON'T want to change visibility status of those)
+        // This variable is called isExtraPanelsVisible, but the panels above
+        // may all be invisible based on extension logic. That's fine. This
+        // variable is really tracking the toggle state, and right now
+        // that state is "visible" (or, "visible if the extensions want it to be visible" maybe).
+        isExtraPanelsVisible = true;
+        visibleExtraPanels.clear();
     }
 }
