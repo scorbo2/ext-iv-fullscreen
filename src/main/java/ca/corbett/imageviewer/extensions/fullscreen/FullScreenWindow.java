@@ -27,6 +27,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -53,6 +55,9 @@ public final class FullScreenWindow extends JFrame {
     private JComponent northComponent;
     private JComponent southComponent;
     private final KeyStrokeManager keyStrokeManager;
+
+    private boolean isExtraPanelsVisible;
+    private final List<JComponent> visibleExtraPanels = new ArrayList<>(4);
 
     public FullScreenWindow(FullScreenExtension owner) {
         super("ImageViewer Fullscreen");
@@ -90,28 +95,58 @@ public final class FullScreenWindow extends JFrame {
      * this method does nothing.
      */
     public void toggleExtraPanelVisibility() {
-        // Note: the logic here isn't great.
+        // Note: the logic here is a bit messier than it feels like it should be. The problems are:
         //   a) we only see JComponents, we have no idea what they actually are.
         //   b) we can't cast them to anything, as we don't have access to the extension code that provides them.
         //   c) the supplying extension may have its own visibility rules that we are violating here.
-        //   d) we just do a blind toggle to invert the current visibility state.
-        //
-        // It's pretty much the best we can do, and it works okay in practice.
-        // The user also has the option of disabling extra panels in application settings,
-        // if they really don't want to see them in full-screen mode.
+        //   d) we don't want to just do a blind toggle to invert the current visibility state.
+        // We need to be careful about toggling visibility.
 
+        // Let's start by enumerating all the extra panels we have:
+        List<JComponent> allExtraPanels = new ArrayList<>(4);
         if (westComponent != null) {
-            westComponent.setVisible(!westComponent.isVisible());
+            allExtraPanels.add(westComponent);
         }
         if (eastComponent != null) {
-            eastComponent.setVisible(!eastComponent.isVisible());
+            allExtraPanels.add(eastComponent);
         }
         if (northComponent != null) {
-            northComponent.setVisible(!northComponent.isVisible());
+            allExtraPanels.add(northComponent);
         }
         if (southComponent != null) {
-            southComponent.setVisible(!southComponent.isVisible());
+            allExtraPanels.add(southComponent);
         }
+
+        // If there are no extra panels, we're done here:
+        if (allExtraPanels.isEmpty()) {
+            return;
+        }
+
+        // If we're toggling visibility OFF, we need to note which
+        // panels were visible when we received this request.
+        // Later, we will ONLY toggle those ones back to visible again.
+        if (isExtraPanelsVisible) {
+            visibleExtraPanels.clear();
+            for (JComponent panel : allExtraPanels) {
+                if (panel.isVisible()) {
+                    visibleExtraPanels.add(panel);
+                    panel.setVisible(false);
+                }
+            }
+        }
+
+        // If we're toggling visibility ON, we only want to make visible
+        // those panels that were visible when we last toggled off.
+        // If any panel was invisible because of extension logic, we leave it alone.
+        else {
+            for (JComponent panel : visibleExtraPanels) {
+                panel.setVisible(true);
+            }
+            visibleExtraPanels.clear();
+        }
+
+        // Flip the toggle for next time:
+        isExtraPanelsVisible = !isExtraPanelsVisible;
     }
 
     public void setImage(ImageInstance image) {
@@ -179,6 +214,7 @@ public final class FullScreenWindow extends JFrame {
         // or copy it programmatically. Really, what I want to do is add this window to
         // the existing KeyStrokesManager instance in MainWindow, but KeyStrokeManager
         // currently only supports a single Window target.
+        // https://github.com/scorbo2/swing-extras/issues/327 will address this.
         for (KeyStrokeProperty prop : AppConfig.getInstance().getKeyStrokeProperties()) {
             // If there's no Action attached, or if there is no keystroke assigned to it, skip it:
             if (prop.getAction() == null || prop.getKeyStroke() == null) {
@@ -253,5 +289,15 @@ public final class FullScreenWindow extends JFrame {
         invalidate();
         revalidate();
         repaint();
+
+        // Right now, any extra panels that should be visible are visible:
+        // (some extensions may hide their panels in some browse modes...
+        //  we DON'T want to change visibility status of those)
+        // This variable is called isExtraPanelsVisible, but the panels above
+        // may all be invisible based on extension logic. That's fine. This
+        // variable is really tracking the toggle state, and right now
+        // that state is "visible" (or, "visible if the extensions want it to be visible" maybe).
+        isExtraPanelsVisible = true;
+        visibleExtraPanels.clear();
     }
 }
