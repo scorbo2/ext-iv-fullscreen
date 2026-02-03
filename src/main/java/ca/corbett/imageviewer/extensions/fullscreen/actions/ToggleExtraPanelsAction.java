@@ -14,14 +14,22 @@ import java.awt.event.ActionEvent;
  */
 public class ToggleExtraPanelsAction extends EnhancedAction {
 
+    private static ToggleExtraPanelsAction instance;
     private final FullScreenExtension extension;
 
-    public ToggleExtraPanelsAction(FullScreenExtension extension) {
+    private ToggleExtraPanelsAction(FullScreenExtension extension) {
         super("Toggle extra panels");
         if (extension == null) {
             throw new IllegalArgumentException("ToggleExtraPanelsAction: extension cannot be null!");
         }
         this.extension = extension;
+    }
+
+    public static ToggleExtraPanelsAction getInstance(FullScreenExtension extension) {
+        if (instance == null) {
+            instance = new ToggleExtraPanelsAction(extension);
+        }
+        return instance;
     }
 
     @Override

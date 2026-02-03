@@ -8,7 +8,6 @@ import ca.corbett.extras.properties.ComboProperty;
 import ca.corbett.extras.properties.KeyStrokeProperty;
 import ca.corbett.extras.properties.PropertiesManager;
 import ca.corbett.imageviewer.AppConfig;
-import ca.corbett.imageviewer.MenuManager;
 import ca.corbett.imageviewer.extensions.ImageViewerExtension;
 import ca.corbett.imageviewer.extensions.fullscreen.actions.FullScreenAction;
 import ca.corbett.imageviewer.extensions.fullscreen.actions.ToggleExtraPanelsAction;
@@ -120,13 +119,12 @@ public class FullScreenExtension extends ImageViewerExtension implements UIReloa
                                      false));
         list.add(new KeyStrokeProperty(fullScreenKeyProp, "Fullscreen mode:",
                                        KeyStrokeManager.parseKeyStroke("Ctrl+F"),
-                                       new FullScreenAction(this, 18)) // icon size ignored here
-                                                                       .setAllowBlank(true)
-                                                                       .addFormFieldGenerationListener(
-                                                                           new ReservedKeyStrokeWorkaround()));
+                                       FullScreenAction.getInstance(this))
+                     .setAllowBlank(true)
+                     .addFormFieldGenerationListener(new ReservedKeyStrokeWorkaround()));
         list.add(new KeyStrokeProperty(extraPanelKeyProp, "Toggle extra panels:",
                                        KeyStrokeManager.parseKeyStroke("Ctrl+P"),
-                                       new ToggleExtraPanelsAction(this))
+                                       ToggleExtraPanelsAction.getInstance(this))
                      .setAllowBlank(true)
                      .addFormFieldGenerationListener(new ReservedKeyStrokeWorkaround()));
 
@@ -135,13 +133,13 @@ public class FullScreenExtension extends ImageViewerExtension implements UIReloa
 
     @Override
     public List<EnhancedAction> getMainToolBarActions() {
-        return List.of(new FullScreenAction(this, 48)); // parent class will resize our icon as needed
+        return List.of(FullScreenAction.getInstance(this));
     }
 
     @Override
     public List<EnhancedAction> getMenuActions(String topLevelMenu, MainWindow.BrowseMode browseMode) {
         if ("View".equals(topLevelMenu)) {
-            return List.of(new FullScreenAction(this, MenuManager.MENU_ICON_SIZE));
+            return List.of(FullScreenAction.getInstance(this));
         }
         return null;
     }

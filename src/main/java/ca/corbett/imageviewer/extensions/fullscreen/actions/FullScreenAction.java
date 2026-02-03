@@ -1,7 +1,6 @@
 package ca.corbett.imageviewer.extensions.fullscreen.actions;
 
 import ca.corbett.extras.EnhancedAction;
-import ca.corbett.imageviewer.AppConfig;
 import ca.corbett.imageviewer.ImageViewerResources;
 import ca.corbett.imageviewer.extensions.fullscreen.FullScreenExtension;
 
@@ -16,14 +15,22 @@ import java.awt.event.ActionEvent;
 public class FullScreenAction extends EnhancedAction {
 
     private static final String NAME = "Full screen mode";
+    private static FullScreenAction instance;
 
     private final FullScreenExtension owner;
 
-    public FullScreenAction(FullScreenExtension owner) {
-        this(owner, AppConfig.getInstance().getToolbarIconSize());
+    private FullScreenAction(FullScreenExtension owner) {
+        this(owner, ImageViewerResources.NATIVE_ICON_SIZE);
     }
 
-    public FullScreenAction(FullScreenExtension owner, int iconSize) {
+    public static FullScreenAction getInstance(FullScreenExtension owner) {
+        if (instance == null) {
+            instance = new FullScreenAction(owner);
+        }
+        return instance;
+    }
+
+    private FullScreenAction(FullScreenExtension owner, int iconSize) {
         super(NAME);
         if (owner == null) {
             throw new IllegalArgumentException("FullScreenAction: owner cannot be null!");
