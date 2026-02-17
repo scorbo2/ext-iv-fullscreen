@@ -167,7 +167,10 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
     }
 
     public void goFullScreen() {
-        kioskTimer = null;
+        if (kioskTimer != null) {
+            kioskTimer.stop();
+            kioskTimer = null;
+        }
         if (isKioskModeEnabled()) {
             kioskTimer = new Timer(getKioskModeDelay(), e -> handleKioskNext());
             kioskTimer.setRepeats(true);
