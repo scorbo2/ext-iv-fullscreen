@@ -353,7 +353,6 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
             // Only update the timer settings if the delay has actually changed, to avoid
             // unnecessary stop/start cycles and excessive log output.
             if (kioskTimer.getDelay() != delayMS) {
-                logger.info("Updating kiosk mode delay to " + delayMS + " ms");
 
                 // Changing the timer delay on the fly is unexpectedly difficult.
                 // Best way I've found is to stop it entirely, update its settings,
