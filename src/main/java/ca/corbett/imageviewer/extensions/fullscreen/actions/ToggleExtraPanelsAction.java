@@ -39,6 +39,6 @@ public class ToggleExtraPanelsAction extends EnhancedAction {
             return;
         }
 
-        extension.getFullScreenWindow().toggleExtraPanelVisibility();
+        extension.getFullScreenWindow().toggleExtraComponentVisibility();
     }
 }
