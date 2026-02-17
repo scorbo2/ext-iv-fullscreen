@@ -223,11 +223,24 @@ public final class FullScreenWindow extends JFrame {
         JPanel wrapperPanel = MainWindow.buildImagePanelWrapperPanel(imagePanel);
 
         // Interrogate it to find the tabbed panes in each position, if present:
-        BorderLayout borderLayout = (BorderLayout)wrapperPanel.getLayout();
-        westComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.WEST));
-        eastComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.EAST));
-        northComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.NORTH));
-        southComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.SOUTH));
+        if (wrapperPanel.getLayout() instanceof BorderLayout borderLayout) {
+            westComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.WEST));
+            eastComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.EAST));
+            northComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.NORTH));
+            southComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.SOUTH));
+        }
+        else {
+            // This *should* never happen, but let's play it safe:
+            // (if this does happen, it disables our ability to toggle extra component visibility)
+            logger.log(Level.WARNING, "FullScreenExtension: "
+                           + "Unexpected wrapper panel layout: {0} (expected BorderLayout); "
+                           + "will be unable to toggle extra component visibility.",
+                       wrapperPanel.getLayout().getClass().getName());
+            westComponent = null;
+            eastComponent = null;
+            northComponent = null;
+            southComponent = null;
+        }
 
         getContentPane().removeAll();
         setLayout(new BorderLayout());
