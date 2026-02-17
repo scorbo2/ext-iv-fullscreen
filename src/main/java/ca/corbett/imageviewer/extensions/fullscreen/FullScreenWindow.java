@@ -6,8 +6,6 @@ import ca.corbett.extras.image.ImagePanelConfig;
 import ca.corbett.extras.io.KeyStrokeManager;
 import ca.corbett.extras.properties.KeyStrokeProperty;
 import ca.corbett.imageviewer.AppConfig;
-import ca.corbett.imageviewer.extensions.ImageViewerExtension;
-import ca.corbett.imageviewer.extensions.ImageViewerExtensionManager;
 import ca.corbett.imageviewer.ui.ImageInstance;
 import ca.corbett.imageviewer.ui.MainWindow;
 
@@ -17,6 +15,7 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
+import javax.swing.JTabbedPane;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.DisplayMode;
@@ -27,8 +26,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -55,9 +52,6 @@ public final class FullScreenWindow extends JFrame {
     private JComponent northComponent;
     private JComponent southComponent;
     private final KeyStrokeManager keyStrokeManager;
-
-    private boolean isExtraPanelsVisible;
-    private final List<JComponent> visibleExtraPanels = new ArrayList<>(4);
 
     public FullScreenWindow(FullScreenExtension owner) {
         super("ImageViewer Fullscreen");
@@ -90,63 +84,28 @@ public final class FullScreenWindow extends JFrame {
     }
 
     /**
-     * Toggles the visibility status of whatever extra panels are currently
-     * showing in this full-screen window. If no extra panels are present,
-     * this method does nothing.
+     * Toggles the visibility status of extra components in our layout, if any are present.
+     * This is a simple toggle, to invert whatever their current visibility state is.
      */
-    public void toggleExtraPanelVisibility() {
-        // Note: the logic here is a bit messier than it feels like it should be. The problems are:
-        //   a) we only see JComponents, we have no idea what they actually are.
-        //   b) we can't cast them to anything, as we don't have access to the extension code that provides them.
-        //   c) the supplying extension may have its own visibility rules that we are violating here.
-        //   d) we don't want to just do a blind toggle to invert the current visibility state.
-        // We need to be careful about toggling visibility.
+    public void toggleExtraComponentVisibility() {
+        // Note: the components we see here are not the extra components supplied directly
+        //       by extensions, but rather JTabbedPane wrappers provided by the utility
+        //       method in MainWindow. So, we don't have to worry about extension-specific
+        //       logic for hiding/showing these components, because the extensions don't actually
+        //       see these tabbed panes at all. We can safely just invert their visibility status.
 
-        // Let's start by enumerating all the extra panels we have:
-        List<JComponent> allExtraPanels = new ArrayList<>(4);
         if (westComponent != null) {
-            allExtraPanels.add(westComponent);
+            westComponent.setVisible(!westComponent.isVisible());
         }
         if (eastComponent != null) {
-            allExtraPanels.add(eastComponent);
+            eastComponent.setVisible(!eastComponent.isVisible());
         }
         if (northComponent != null) {
-            allExtraPanels.add(northComponent);
+            northComponent.setVisible(!northComponent.isVisible());
         }
         if (southComponent != null) {
-            allExtraPanels.add(southComponent);
+            southComponent.setVisible(!southComponent.isVisible());
         }
-
-        // If there are no extra panels, we're done here:
-        if (allExtraPanels.isEmpty()) {
-            return;
-        }
-
-        // If we're toggling visibility OFF, we need to note which
-        // panels were visible when we received this request.
-        // Later, we will ONLY toggle those ones back to visible again.
-        if (isExtraPanelsVisible) {
-            visibleExtraPanels.clear();
-            for (JComponent panel : allExtraPanels) {
-                if (panel.isVisible()) {
-                    visibleExtraPanels.add(panel);
-                    panel.setVisible(false);
-                }
-            }
-        }
-
-        // If we're toggling visibility ON, we only want to make visible
-        // those panels that were visible when we last toggled off.
-        // If any panel was invisible because of extension logic, we leave it alone.
-        else {
-            for (JComponent panel : visibleExtraPanels) {
-                panel.setVisible(true);
-            }
-            visibleExtraPanels.clear();
-        }
-
-        // Flip the toggle for next time:
-        isExtraPanelsVisible = !isExtraPanelsVisible;
     }
 
     public void setImage(ImageInstance image) {
@@ -260,28 +219,28 @@ public final class FullScreenWindow extends JFrame {
      * including any extra panels provided by other extensions.
      */
     public void rebuildLayout() {
-        // Detect extra panels, if any are supplied by other extensions:
-        ImageViewerExtensionManager extManager = ImageViewerExtensionManager.getInstance();
-        westComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Left);
-        eastComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Right);
-        northComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Top);
-        southComponent = extManager.getExtraPanelComponent(ImageViewerExtension.ExtraPanelPosition.Bottom);
+        // Build our wrapper panel:
+        JPanel wrapperPanel = MainWindow.buildImagePanelWrapperPanel(imagePanel);
 
-        JPanel wrapperPanel = new JPanel();
-        wrapperPanel.setLayout(new BorderLayout());
-        if (westComponent != null) {
-            wrapperPanel.add(westComponent, BorderLayout.WEST);
+        // Interrogate it to find the tabbed panes in each position, if present:
+        if (wrapperPanel.getLayout() instanceof BorderLayout borderLayout) {
+            westComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.WEST));
+            eastComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.EAST));
+            northComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.NORTH));
+            southComponent = findComponent(borderLayout.getLayoutComponent(BorderLayout.SOUTH));
         }
-        if (eastComponent != null) {
-            wrapperPanel.add(eastComponent, BorderLayout.EAST);
+        else {
+            // This *should* never happen, but let's play it safe:
+            // (if this does happen, it disables our ability to toggle extra component visibility)
+            logger.log(Level.WARNING, "FullScreenExtension: "
+                           + "Unexpected wrapper panel layout: {0} (expected BorderLayout); "
+                           + "will be unable to toggle extra component visibility.",
+                       wrapperPanel.getLayout().getClass().getName());
+            westComponent = null;
+            eastComponent = null;
+            northComponent = null;
+            southComponent = null;
         }
-        if (northComponent != null) {
-            wrapperPanel.add(northComponent, BorderLayout.NORTH);
-        }
-        if (southComponent != null) {
-            wrapperPanel.add(southComponent, BorderLayout.SOUTH);
-        }
-        wrapperPanel.add(imagePanel, BorderLayout.CENTER);
 
         getContentPane().removeAll();
         setLayout(new BorderLayout());
@@ -289,15 +248,9 @@ public final class FullScreenWindow extends JFrame {
         invalidate();
         revalidate();
         repaint();
+    }
 
-        // Right now, any extra panels that should be visible are visible:
-        // (some extensions may hide their panels in some browse modes...
-        //  we DON'T want to change visibility status of those)
-        // This variable is called isExtraPanelsVisible, but the panels above
-        // may all be invisible based on extension logic. That's fine. This
-        // variable is really tracking the toggle state, and right now
-        // that state is "visible" (or, "visible if the extensions want it to be visible" maybe).
-        isExtraPanelsVisible = true;
-        visibleExtraPanels.clear();
+    private JTabbedPane findComponent(Object candidate) {
+        return (candidate instanceof JTabbedPane) ? (JTabbedPane)candidate : null;
     }
 }
