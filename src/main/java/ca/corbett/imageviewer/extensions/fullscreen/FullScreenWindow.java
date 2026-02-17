@@ -366,6 +366,15 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
                 kioskTimer.setInitialDelay(delayMS);
                 SwingUtilities.invokeLater(() -> kioskTimer.start()); // restart the timer on the EDT, to be safe
             }
+
+            // While we're at it, we'll just confirm that kiosk mode is still enabled,
+            // because if the user disabled it while we were running, we want to stop the timer entirely:
+            if (!isKioskModeEnabled()) {
+                kioskTimer.stop();
+                kioskTimer = null;
+                logger.info("Kiosk mode disabled; full screen mode must be restarted if you want to re-enable it.");
+                // Note: user must exit and re-enter full-screen mode to re-enable kiosk mode.
+            }
         }
     }
 
@@ -382,12 +391,19 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
             return;
         }
 
+        // We don't want our own thumb selection changes to trigger the kiosk timer to reset,
+        // so we temporarily remove ourselves as a listener while we change the selection:
+        MainWindow.getInstance().removeThumbContainerPanelListener(this);
+
         if (currentIndex >= totalCount - 1) {
             MainWindow.getInstance().selectThumbnailAtIndex(0); // rewind to start if we hit the end
         }
         else {
             MainWindow.getInstance().selectNextImage();
         }
+
+        // Now start listening again:
+        MainWindow.getInstance().addThumbContainerPanelListener(this);
     }
 
     @Override
