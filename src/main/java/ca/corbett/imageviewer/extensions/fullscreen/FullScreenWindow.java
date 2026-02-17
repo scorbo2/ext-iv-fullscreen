@@ -348,19 +348,24 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
         // We'll re-check our animation delay each time, because the user can actually
         // change it while we're running:
         if (kioskTimer != null) {
-            logger.info("Updating kiosk mode delay to " + getKioskModeDelay() + " ms");
-
-            // Changing the timer delay on the fly is unexpectedly difficult.
-            // Best way I've found is to stop it entirely, update its settings,
-            // then start it again, but on the EDT just to be safe, since Timer is not thread-safe.
-            // Even with all this code, the "current" cycle of the timer will use the old value
-            // (even though we stop and start it, annoyingly)
-            // The following cycle will use the new value.
-            kioskTimer.stop();
             int delayMS = getKioskModeDelay();
-            kioskTimer.setDelay(delayMS);
-            kioskTimer.setInitialDelay(delayMS);
-            SwingUtilities.invokeLater(() -> kioskTimer.start()); // restart the timer on the EDT, to be safe
+
+            // Only update the timer settings if the delay has actually changed, to avoid
+            // unnecessary stop/start cycles and excessive log output.
+            if (kioskTimer.getDelay() != delayMS) {
+                logger.info("Updating kiosk mode delay to " + delayMS + " ms");
+
+                // Changing the timer delay on the fly is unexpectedly difficult.
+                // Best way I've found is to stop it entirely, update its settings,
+                // then start it again, but on the EDT just to be safe, since Timer is not thread-safe.
+                // Even with all this code, the "current" cycle of the timer will use the old value
+                // (even though we stop and start it, annoyingly)
+                // The following cycle will use the new value.
+                kioskTimer.stop();
+                kioskTimer.setDelay(delayMS);
+                kioskTimer.setInitialDelay(delayMS);
+                SwingUtilities.invokeLater(() -> kioskTimer.start()); // restart the timer on the EDT, to be safe
+            }
         }
     }
 
