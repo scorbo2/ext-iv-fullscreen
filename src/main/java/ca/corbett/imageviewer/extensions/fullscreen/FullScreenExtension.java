@@ -4,7 +4,9 @@ import ca.corbett.extensions.AppExtensionInfo;
 import ca.corbett.extras.EnhancedAction;
 import ca.corbett.extras.io.KeyStrokeManager;
 import ca.corbett.extras.properties.AbstractProperty;
+import ca.corbett.extras.properties.BooleanProperty;
 import ca.corbett.extras.properties.ComboProperty;
+import ca.corbett.extras.properties.IntegerProperty;
 import ca.corbett.extras.properties.KeyStrokeProperty;
 import ca.corbett.extras.properties.PropertiesManager;
 import ca.corbett.imageviewer.AppConfig;
@@ -55,6 +57,9 @@ public class FullScreenExtension extends ImageViewerExtension implements UIReloa
     private FullScreenWindow fullScreenWindow;
 
     private static final String fullScreenIndexProp = "UI.Fullscreen.monitorIndex";
+    public static final String kioskModeProp = "UI.Fullscreen.kioskMode";
+    public static final String kioskModeDelayProp = "UI.Fullscreen.kioskModeDelaySeconds";
+    public static final String kioskModeAnimationProp = "UI.Fullscreen.kioskModeAnimationEnabled";
     private static final String fullScreenKeyProp = AppConfig.KEYSTROKE_PREFIX + "Fullscreen mode.toggleKeyStroke";
     private static final String extraPanelKeyProp = AppConfig.KEYSTROKE_PREFIX + "Fullscreen mode.toggleExtraPanelKeyStroke";
 
@@ -111,12 +116,18 @@ public class FullScreenExtension extends ImageViewerExtension implements UIReloa
             displayChoices.add("Screen " + (i + 1));
         }
 
+        // General config properties:
         List<AbstractProperty> list = new ArrayList<>();
         list.add(new ComboProperty<>(fullScreenIndexProp,
                                      "Full screen monitor",
                                      displayChoices,
                                      0, // default first monitor
                                      false));
+        list.add(new BooleanProperty(kioskModeProp, "Enable kiosk mode (auto-next image after delay)", false));
+        list.add(new IntegerProperty(kioskModeDelayProp, "Kiosk mode delay (s):", 5, 1, 3600, 1));
+        list.add(new BooleanProperty(kioskModeAnimationProp, "Enable fade transitions in kiosk mode", true));
+
+        // Keystrokes:
         list.add(new KeyStrokeProperty(fullScreenKeyProp, "Fullscreen mode:",
                                        KeyStrokeManager.parseKeyStroke("Ctrl+F"),
                                        FullScreenAction.getInstance(this))
