@@ -3,19 +3,29 @@ package ca.corbett.imageviewer.extensions.fullscreen;
 import ca.corbett.extras.LookAndFeelManager;
 import ca.corbett.extras.image.ImagePanel;
 import ca.corbett.extras.image.ImagePanelConfig;
+import ca.corbett.extras.image.animation.FadeLayerUI;
 import ca.corbett.extras.io.KeyStrokeManager;
+import ca.corbett.extras.properties.AbstractProperty;
+import ca.corbett.extras.properties.BooleanProperty;
+import ca.corbett.extras.properties.IntegerProperty;
 import ca.corbett.extras.properties.KeyStrokeProperty;
 import ca.corbett.imageviewer.AppConfig;
 import ca.corbett.imageviewer.ui.ImageInstance;
 import ca.corbett.imageviewer.ui.MainWindow;
+import ca.corbett.imageviewer.ui.ThumbContainerPanel;
+import ca.corbett.imageviewer.ui.ThumbContainerPanelListener;
+import ca.corbett.imageviewer.ui.ThumbPanel;
 
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
+import javax.swing.JLayer;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
 import javax.swing.JTabbedPane;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.DisplayMode;
@@ -40,11 +50,13 @@ import java.util.logging.Logger;
  *
  * @author <a href="https://github.com/scorbo2">scorbo2</a>
  */
-public final class FullScreenWindow extends JFrame {
+public final class FullScreenWindow extends JFrame implements ThumbContainerPanelListener {
 
     private static final Logger logger = Logger.getLogger(FullScreenWindow.class.getName());
     private GraphicsDevice graphicsDevice;
     private final ImagePanel imagePanel;
+    private final JLayer<JPanel> layeredPanel;
+    private final FadeLayerUI fadeLayerUI;
     private final ImagePanelConfig imagePanelConf;
     private final FullScreenExtension owner;
     private JComponent westComponent;
@@ -52,6 +64,7 @@ public final class FullScreenWindow extends JFrame {
     private JComponent northComponent;
     private JComponent southComponent;
     private final KeyStrokeManager keyStrokeManager;
+    private Timer kioskTimer;
 
     public FullScreenWindow(FullScreenExtension owner) {
         super("ImageViewer Fullscreen");
@@ -68,6 +81,8 @@ public final class FullScreenWindow extends JFrame {
         imagePanelConf = ImagePanelConfig.createSimpleReadOnlyProperties();
         imagePanelConf.setBgColor(LookAndFeelManager.getLafColor("Panel.background", Color.LIGHT_GRAY));
         imagePanel = new ImagePanel(imagePanelConf);
+        fadeLayerUI = buildFadeUI();
+        layeredPanel = new JLayer<>(imagePanel, fadeLayerUI);
 
         rebuildLayout();
 
@@ -152,10 +167,23 @@ public final class FullScreenWindow extends JFrame {
     }
 
     public void goFullScreen() {
+        kioskTimer = null;
+        if (isKioskModeEnabled()) {
+            kioskTimer = new Timer(getKioskModeDelay(), e -> handleKioskNext());
+            kioskTimer.setRepeats(true);
+            kioskTimer.start();
+        }
+        MainWindow.getInstance().addThumbContainerPanelListener(this);
+
         graphicsDevice.setFullScreenWindow(this);
     }
 
     public void stopFullScreen() {
+        if (kioskTimer != null) {
+            kioskTimer.stop();
+            kioskTimer = null;
+        }
+        MainWindow.getInstance().removeThumbContainerPanelListener(this);
         graphicsDevice.setFullScreenWindow(null);
         setAlwaysOnTop(false);
         setVisible(false);
@@ -193,6 +221,14 @@ public final class FullScreenWindow extends JFrame {
         });
     }
 
+    private static FadeLayerUI buildFadeUI() {
+        FadeLayerUI ui = new FadeLayerUI();
+        ui.setFadeColor(AppConfig.getInstance().getImagePanelBackgroundColor());
+        ui.setAnimationDuration(FadeLayerUI.AnimationDuration.Medium);
+        ui.setAnimationSpeed(FadeLayerUI.AnimationSpeed.Fast);
+        return ui;
+    }
+
     /**
      * Does a sanity check on our preferred display, because it may not exist.
      * This can happen if you set it up on a laptop when you were docked to an external
@@ -220,7 +256,7 @@ public final class FullScreenWindow extends JFrame {
      */
     public void rebuildLayout() {
         // Build our wrapper panel:
-        JPanel wrapperPanel = MainWindow.buildImagePanelWrapperPanel(imagePanel);
+        JPanel wrapperPanel = MainWindow.buildImagePanelWrapperPanel(layeredPanel);
 
         // Interrogate it to find the tabbed panes in each position, if present:
         if (wrapperPanel.getLayout() instanceof BorderLayout borderLayout) {
@@ -252,5 +288,121 @@ public final class FullScreenWindow extends JFrame {
 
     private JTabbedPane findComponent(Object candidate) {
         return (candidate instanceof JTabbedPane) ? (JTabbedPane)candidate : null;
+    }
+
+    /**
+     * Looks up our "kiosk mode" checkbox and returns whether it is currently checked.
+     */
+    private boolean isKioskModeEnabled() {
+        AppConfig appConfig = AppConfig.getInstance();
+        AbstractProperty prop = appConfig.getPropertiesManager().getProperty(FullScreenExtension.kioskModeProp);
+        return (prop instanceof BooleanProperty) && ((BooleanProperty)prop).getValue();
+    }
+
+    /**
+     * Reports whether animated transitions are enabled in AppConfig.
+     */
+    private boolean isKioskModeAnimationEnabled() {
+        AppConfig appConfig = AppConfig.getInstance();
+        AbstractProperty prop = appConfig.getPropertiesManager()
+                                         .getProperty(FullScreenExtension.kioskModeAnimationProp);
+        return (prop instanceof BooleanProperty) && ((BooleanProperty)prop).getValue();
+    }
+
+    /**
+     * Looks up our "kiosk mode delay" property and returns the current value as an integer.
+     */
+    private int getKioskModeDelay() {
+        AppConfig appConfig = AppConfig.getInstance();
+        AbstractProperty prop = appConfig.getPropertiesManager().getProperty(FullScreenExtension.kioskModeDelayProp);
+        if (prop instanceof IntegerProperty intProp) {
+            return intProp.getValue() * 1000; // convert seconds to milliseconds for Timer
+        }
+        return Integer.MAX_VALUE; // failsafe default, basically disable kiosk mode
+    }
+
+    /**
+     * In "Kiosk mode", we will automatically advance to the next image after a configurable delay.
+     * If we hit the end of the current directory or image set, we will "rewind" back to the first
+     * image and keep going from there. This is handy for throwing a slideshow up on a monitor
+     * and just leaving it, almost like a screensaver.
+     */
+    private void handleKioskNext() {
+
+        // If we're not animating, just do a simple flip to the next image:
+        if (!isKioskModeAnimationEnabled()) {
+            flipToNext();
+        }
+
+        // Otherwise, let's do a quick fade-out/fade-in to show the next image:
+        else {
+            fadeLayerUI.fadeOut(() -> {
+                flipToNext();
+                fadeLayerUI.fadeIn(null);
+            });
+        }
+
+        // We'll re-check our animation delay each time, because the user can actually
+        // change it while we're running:
+        if (kioskTimer != null) {
+            logger.info("Updating kiosk mode delay to " + getKioskModeDelay() + " ms");
+
+            // Changing the timer delay on the fly is unexpectedly difficult.
+            // Best way I've found is to stop it entirely, update its settings,
+            // then start it again, but on the EDT just to be safe, since Timer is not thread-safe.
+            // Even with all this code, the "current" cycle of the timer will use the old value
+            // (even though we stop and start it, annoyingly)
+            // The following cycle will use the new value.
+            kioskTimer.stop();
+            int delayMS = getKioskModeDelay();
+            kioskTimer.setDelay(delayMS);
+            kioskTimer.setInitialDelay(delayMS);
+            SwingUtilities.invokeLater(() -> kioskTimer.start()); // restart the timer on the EDT, to be safe
+        }
+    }
+
+    /**
+     * Performs an immediate flip to the next image in the current directory or image set,
+     * with wraparound back to the first image if we hit the end.
+     */
+    private void flipToNext() {
+        int totalCount = MainWindow.getInstance().getThumbnailCount();
+        int currentIndex = MainWindow.getInstance().getThumbnailSelectionIndex();
+
+        if (totalCount == 0 || currentIndex == -1) {
+            // No images, or no image selected, so nothing to do:
+            return;
+        }
+
+        if (currentIndex >= totalCount - 1) {
+            MainWindow.getInstance().selectThumbnailAtIndex(0); // rewind to start if we hit the end
+        }
+        else {
+            MainWindow.getInstance().selectNextImage();
+        }
+    }
+
+    @Override
+    public void thumbnailSelected(ThumbContainerPanel source, ThumbPanel selectedPanel) {
+        if (kioskTimer != null) {
+            // If we're in kiosk mode, we want to reset the timer every time the user manually selects an image,
+            // so that we don't have the timer suddenly fire while they're looking at an image they just selected.
+            kioskTimer.restart();
+        }
+    }
+
+    @Override
+    public void selectionCleared(ThumbContainerPanel source) {
+        // From our ThumbContainerPanelListener interface - ignored
+    }
+
+    @Override
+    public void loadStarting(ThumbContainerPanel source) {
+        // From our ThumbContainerPanelListener interface - ignored
+    }
+
+    @Override
+    public void loadCompleted(ThumbContainerPanel source) {
+        // From our ThumbContainerPanelListener interface - ignored
     }
 }
