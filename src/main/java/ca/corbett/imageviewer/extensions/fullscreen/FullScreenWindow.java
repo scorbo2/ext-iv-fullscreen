@@ -395,7 +395,7 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
         MainWindow.getInstance().removeThumbContainerPanelListener(this);
 
         if (currentIndex >= totalCount - 1) {
-            MainWindow.getInstance().selectThumbnailAtIndex(0); // rewind to start if we hit the end
+            MainWindow.getInstance().selectFirstThumbnail(); // wrap around to start if we hit the end.
         }
         else {
             MainWindow.getInstance().selectNextImage();
