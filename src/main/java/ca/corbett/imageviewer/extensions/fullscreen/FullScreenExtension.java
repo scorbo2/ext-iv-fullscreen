@@ -15,7 +15,6 @@ import ca.corbett.imageviewer.extensions.fullscreen.actions.FullScreenAction;
 import ca.corbett.imageviewer.extensions.fullscreen.actions.ToggleExtraPanelsAction;
 import ca.corbett.imageviewer.ui.ImageInstance;
 import ca.corbett.imageviewer.ui.MainWindow;
-import ca.corbett.imageviewer.ui.ReservedKeyStrokeWorkaround;
 import ca.corbett.imageviewer.ui.UIReloadable;
 import ca.corbett.imageviewer.ui.actions.ReloadUIAction;
 
@@ -132,12 +131,13 @@ public class FullScreenExtension extends ImageViewerExtension implements UIReloa
                                        KeyStrokeManager.parseKeyStroke("Ctrl+F"),
                                        FullScreenAction.getInstance(this))
                      .setAllowBlank(true)
-                     .addFormFieldGenerationListener(new ReservedKeyStrokeWorkaround()));
+                     .setReservedKeyStrokes(AppConfig.RESERVED_KEYSTROKES));
         list.add(new KeyStrokeProperty(extraPanelKeyProp, "Toggle extra panels:",
                                        KeyStrokeManager.parseKeyStroke("Ctrl+P"),
                                        ToggleExtraPanelsAction.getInstance(this))
                      .setAllowBlank(true)
-                     .addFormFieldGenerationListener(new ReservedKeyStrokeWorkaround()));
+                     .setReservedKeyStrokes(AppConfig.RESERVED_KEYSTROKES)
+                     .setHelpText("Toggle the visibility of any extra panels on the fullscreen window."));
 
         return list;
     }
@@ -196,7 +196,7 @@ public class FullScreenExtension extends ImageViewerExtension implements UIReloa
     @Override
     public void reloadUI() {
         if (fullScreenWindow != null) {
-            fullScreenWindow.setCustomBackground(AppConfig.getInstance().getImagePanelBackgroundColor());
+            fullScreenWindow.setCustomBackground(AppConfig.getInstance().getDefaultBackground());
             fullScreenWindow.rebuildLayout(); // extensions providing extra panels may have changed
             fullScreenWindow.configureKeyStrokes(); // keyboard shortcuts may have changed
         }

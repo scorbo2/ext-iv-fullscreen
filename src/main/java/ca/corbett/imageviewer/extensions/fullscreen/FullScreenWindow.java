@@ -3,6 +3,8 @@ package ca.corbett.imageviewer.extensions.fullscreen;
 import ca.corbett.extras.LookAndFeelManager;
 import ca.corbett.extras.image.ImagePanel;
 import ca.corbett.extras.image.ImagePanelConfig;
+import ca.corbett.extras.image.animation.AnimationDuration;
+import ca.corbett.extras.image.animation.AnimationSpeed;
 import ca.corbett.extras.image.animation.FadeLayerUI;
 import ca.corbett.extras.io.KeyStrokeManager;
 import ca.corbett.extras.properties.AbstractProperty;
@@ -226,9 +228,9 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
 
     private static FadeLayerUI buildFadeUI() {
         FadeLayerUI ui = new FadeLayerUI();
-        ui.setFadeColor(AppConfig.getInstance().getImagePanelBackgroundColor());
-        ui.setAnimationDuration(FadeLayerUI.AnimationDuration.Medium);
-        ui.setAnimationSpeed(FadeLayerUI.AnimationSpeed.Fast);
+        ui.setFadeColor(AppConfig.getInstance().getDefaultBackground());
+        ui.setAnimationDuration(AnimationDuration.Medium);
+        ui.setAnimationSpeed(AnimationSpeed.Fast);
         return ui;
     }
 
