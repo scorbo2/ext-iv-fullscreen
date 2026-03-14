@@ -26,13 +26,14 @@ will prompt you to restart. It's just that easy!
 ### Option 2: manual download
 
 You can manually download the extension jar: 
-[ext-iv-fullscreen-2.3.0.jar](http://www.corbett.ca/apps/ImageViewer/extensions/2.3/ext-iv-fullscreen-2.3.0.jar)
+[ext-iv-fullscreen-3.0.0.jar](http://www.corbett.ca/apps/ImageViewer/extensions/3.0/ext-iv-fullscreen-3.0.0.jar)
 
 Save it to your ~/.ImageViewer/extensions directory and restart the application
 
 ### Option 3: build from source
 
-You can clone this repo and build the extension jar with Maven (Java 17 or higher required):
+You can clone this repo and build the extension jar with Maven (Java 17 or higher required).
+Note! You must have run `mvn install` in the main ImageViewer repo first, as it is a dependency for this extension.
 
 ```shell
 git clone https://github.com/scorbo2/ext-iv-fullscreen.git
@@ -40,7 +41,7 @@ cd ext-iv-fullscreen
 mvn package
 
 # Copy the result to extensions directory:
-cp target/ext-iv-fullscreen-2.3.0.jar ~/.ImageViewer/extensions
+cp target/ext-iv-fullscreen-3.0.0.jar ~/.ImageViewer/extensions
 ```
 
 ## Okay, it's installed, now how do I use it?
@@ -55,8 +56,8 @@ If you are on a system that only has one display, that display will be used auto
 
 ### Requirements
 
-Imageviewer 2.3 or higher.
+Compatible with any ImageViewer 3.x release.
 
 ### License
 
-Imageviewer and this extension are made available under the MIT license: https://opensource.org/license/mit
+ImageViewer and this extension are made available under the MIT license: https://opensource.org/license/mit

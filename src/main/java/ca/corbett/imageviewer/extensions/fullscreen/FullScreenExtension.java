@@ -1,47 +1,66 @@
 package ca.corbett.imageviewer.extensions.fullscreen;
 
 import ca.corbett.extensions.AppExtensionInfo;
-import ca.corbett.extras.image.ImageUtil;
+import ca.corbett.extras.EnhancedAction;
+import ca.corbett.extras.io.KeyStrokeManager;
 import ca.corbett.extras.properties.AbstractProperty;
+import ca.corbett.extras.properties.BooleanProperty;
 import ca.corbett.extras.properties.ComboProperty;
+import ca.corbett.extras.properties.IntegerProperty;
+import ca.corbett.extras.properties.KeyStrokeProperty;
+import ca.corbett.extras.properties.PropertiesManager;
 import ca.corbett.imageviewer.AppConfig;
-import ca.corbett.imageviewer.ToolBarManager;
 import ca.corbett.imageviewer.extensions.ImageViewerExtension;
+import ca.corbett.imageviewer.extensions.fullscreen.actions.FullScreenAction;
+import ca.corbett.imageviewer.extensions.fullscreen.actions.ToggleExtraPanelsAction;
 import ca.corbett.imageviewer.ui.ImageInstance;
 import ca.corbett.imageviewer.ui.MainWindow;
+import ca.corbett.imageviewer.ui.UIReloadable;
+import ca.corbett.imageviewer.ui.actions.ReloadUIAction;
 
-import javax.swing.JButton;
-import javax.swing.JMenuItem;
-import javax.swing.KeyStroke;
-import java.awt.Color;
 import java.awt.GraphicsEnvironment;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * An extension to ImageViewer that provides a full-screen viewing mode for the current directory.
+ * An extension to ImageViewer that provides a full-screen viewing mode for the current
+ * directory or image set. When full-screen mode is initiated, a new borderless window
+ * is created on the selected monitor (as per the extension's configuration setting),
+ * and the currently selected image is shown there at best fit size. The user can then
+ * navigate through the images in the current file list using the keyboard, and exit
+ * full-screen mode by pressing the Escape key.
+ * <p>
  * The usual keyboard shortcuts will work to navigate forwards or backwards, or to delete
- * the selected image. The main image panel will be given a popup menu that matches the
- * one in the main window, to allow access to quick move and other options. This extension
- * is also compatible with the QuickAccess extension! If the QuickAccess extension is present
- * and enabled, and a quick access panel has been set up in the main window, it will also
- * show here when full-screen mode is initiated.
+ * the selected image. The usual popup menu options are also supported in fullscreen mode.
+ * This extension is compatible with other extensions! For example, if the QuickAccess
+ * extension is present and enabled, then the QuickAccess panel will also
+ * show here when full-screen mode is initiated. The same is true for the ICE quick tag
+ * extension option, or other extensions that add additional image panel options and features.
+ * </p>
+ * <p>
+ * <B>What if I'm on a laptop that sometimes has an external monitor, and sometimes not?</B>
+ * It's not a problem. You can select monitor 2 in application settings when connected to the
+ * external monitor. The application will remember that preference. If fullscreen mode is
+ * started when the external monitor is not connected, the extension will detect that,
+ * and automatically revert to using the primary monitor instead, for that session. Later,
+ * when the monitor is connected again, it will work as per the saved preference.
+ * </p>
  *
- * @author scorbett
+ * @author <a href="https://github.com/scorbo2">scorbo2</a>
  */
-public class FullScreenExtension extends ImageViewerExtension {
+public class FullScreenExtension extends ImageViewerExtension implements UIReloadable {
 
     private static final Logger logger = Logger.getLogger(FullScreenExtension.class.getName());
     private final AppExtensionInfo extInfo;
     private FullScreenWindow fullScreenWindow;
 
-    private final String fullScreenIndexPropName = "UI.Fullscreen.monitorIndex";
-    private BufferedImage fullScreenIconImage;
+    private static final String fullScreenIndexProp = "UI.Fullscreen.monitorIndex";
+    public static final String kioskModeProp = "UI.Fullscreen.kioskMode";
+    public static final String kioskModeDelayProp = "UI.Fullscreen.kioskModeDelaySeconds";
+    public static final String kioskModeAnimationProp = "UI.Fullscreen.kioskModeAnimationEnabled";
+    private static final String fullScreenKeyProp = AppConfig.KEYSTROKE_PREFIX + "Fullscreen mode.toggleKeyStroke";
+    private static final String extraPanelKeyProp = AppConfig.KEYSTROKE_PREFIX + "Fullscreen mode.toggleExtraPanelKeyStroke";
 
     public FullScreenExtension() {
         extInfo = AppExtensionInfo.fromExtensionJar(getClass(),
@@ -51,10 +70,17 @@ public class FullScreenExtension extends ImageViewerExtension {
         }
     }
 
+    /**
+     * Returns the index of the monitor to use for full-screen mode, as per the
+     * extension's configuration setting.
+     */
     public int getFullScreenMonitorIndex() {
-        //noinspection unchecked
-        return ((ComboProperty<String>)AppConfig.getInstance().getPropertiesManager()
-                                                .getProperty(fullScreenIndexPropName)).getSelectedIndex();
+        PropertiesManager propsManager = AppConfig.getInstance().getPropertiesManager();
+        AbstractProperty prop = propsManager.getProperty(fullScreenIndexProp);
+        if (prop instanceof ComboProperty<?> comboProp) {
+            return comboProp.getSelectedIndex();
+        }
+        return 0; // failsafe
     }
 
     @Override
@@ -64,15 +90,19 @@ public class FullScreenExtension extends ImageViewerExtension {
 
     @Override
     public void loadJarResources() {
-        try {
-            fullScreenIconImage = ImageUtil.loadFromResource(getClass(),
-                                                             "/ca/corbett/imageviewer/extensions/fullscreen/icon-fullscreen.png",
-                                                             ToolBarManager.iconSize,
-                                                             ToolBarManager.iconSize);
-        }
-        catch (IOException ioe) {
-            throw new RuntimeException("FullScreenExtension: can't load jar resources!", ioe);
-        }
+        // Our icon resource is provided by the parent application, so nothing to do here.
+    }
+
+    @Override
+    public void onActivate() {
+        // Listen for UI reloads so we can update ourselves as needed:
+        ReloadUIAction.getInstance().registerReloadable(this);
+    }
+
+    @Override
+    public void onDeactivate() {
+        // Stop listening for UI reloads:
+        ReloadUIAction.getInstance().unregisterReloadable(this);
     }
 
     @Override
@@ -85,26 +115,42 @@ public class FullScreenExtension extends ImageViewerExtension {
             displayChoices.add("Screen " + (i + 1));
         }
 
+        // General config properties:
         List<AbstractProperty> list = new ArrayList<>();
-        list.add(new ComboProperty<>(fullScreenIndexPropName, "Full screen monitor", displayChoices, 0, false));
+        list.add(new ComboProperty<>(fullScreenIndexProp,
+                                     "Full screen monitor",
+                                     displayChoices,
+                                     0, // default first monitor
+                                     false));
+        list.add(new BooleanProperty(kioskModeProp, "Enable kiosk mode (auto-next image after delay)", false));
+        list.add(new IntegerProperty(kioskModeDelayProp, "Kiosk mode delay (s):", 5, 1, 3600, 1));
+        list.add(new BooleanProperty(kioskModeAnimationProp, "Enable fade transitions in kiosk mode", true));
+
+        // Keystrokes:
+        list.add(new KeyStrokeProperty(fullScreenKeyProp, "Fullscreen mode:",
+                                       KeyStrokeManager.parseKeyStroke("Ctrl+F"),
+                                       FullScreenAction.getInstance(this))
+                     .setAllowBlank(true)
+                     .setReservedKeyStrokes(AppConfig.RESERVED_KEYSTROKES));
+        list.add(new KeyStrokeProperty(extraPanelKeyProp, "Toggle extra panels:",
+                                       KeyStrokeManager.parseKeyStroke("Ctrl+P"),
+                                       ToggleExtraPanelsAction.getInstance(this))
+                     .setAllowBlank(true)
+                     .setReservedKeyStrokes(AppConfig.RESERVED_KEYSTROKES)
+                     .setHelpText("Toggle the visibility of any extra panels on the fullscreen window."));
+
         return list;
     }
 
     @Override
-    public List<JButton> getMainToolBarButtons() {
-        List<JButton> list = new ArrayList<>();
-        list.add(ToolBarManager.buildButton(fullScreenIconImage, "Full Screen mode", new FullScreenAction(this)));
-        return list;
+    public List<EnhancedAction> getMainToolBarActions() {
+        return List.of(FullScreenAction.getInstance(this));
     }
 
     @Override
-    public List<JMenuItem> getMenuItems(String topLevelMenu, MainWindow.BrowseMode browseMode) {
+    public List<EnhancedAction> getMenuActions(String topLevelMenu, MainWindow.BrowseMode browseMode) {
         if ("View".equals(topLevelMenu)) {
-            List<JMenuItem> list = new ArrayList<>();
-            JMenuItem item = new JMenuItem(new FullScreenAction(this));
-            item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK));
-            list.add(item);
-            return list;
+            return List.of(FullScreenAction.getInstance(this));
         }
         return null;
     }
@@ -142,10 +188,17 @@ public class FullScreenExtension extends ImageViewerExtension {
         }
     }
 
+    /**
+     * Invoked when the user OKs the settings dialog or the extension manager dialog.
+     * We use this to update our full-screen window background color and rebuild its
+     * layout, as the list of extension-supplied extra panels may have changed.
+     */
     @Override
-    public void imagePanelBackgroundChanged(Color newColor) {
+    public void reloadUI() {
         if (fullScreenWindow != null) {
-            fullScreenWindow.setCustomBackground(newColor);
+            fullScreenWindow.setCustomBackground(AppConfig.getInstance().getDefaultBackground());
+            fullScreenWindow.rebuildLayout(); // extensions providing extra panels may have changed
+            fullScreenWindow.configureKeyStrokes(); // keyboard shortcuts may have changed
         }
     }
 
@@ -166,6 +219,10 @@ public class FullScreenExtension extends ImageViewerExtension {
         fullScreenWindow.goFullScreen();
     }
 
+    public FullScreenWindow getFullScreenWindow() {
+        return fullScreenWindow;
+    }
+
     public boolean isFullscreenActive() {
         return (fullScreenWindow != null);
     }
@@ -173,5 +230,4 @@ public class FullScreenExtension extends ImageViewerExtension {
     public void fullScreenEnded() {
         fullScreenWindow = null;
     }
-
 }
