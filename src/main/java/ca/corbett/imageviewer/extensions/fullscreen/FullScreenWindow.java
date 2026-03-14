@@ -98,6 +98,9 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
     public void setCustomBackground(Color c) {
         imagePanelConf.setBgColor(c);
         imagePanel.applyProperties(imagePanelConf);
+        
+        // Ensure the fade overlay uses the updated background color for transitions
+        fadeLayerUI.setFadeColor(c);
     }
 
     /**
