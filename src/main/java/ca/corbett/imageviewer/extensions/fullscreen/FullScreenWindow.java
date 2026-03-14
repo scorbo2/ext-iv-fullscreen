@@ -163,7 +163,7 @@ public final class FullScreenWindow extends JFrame implements ThumbContainerPane
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                owner.fullScreenEnded();
+                stopFullScreen();
             }
         });
     }
